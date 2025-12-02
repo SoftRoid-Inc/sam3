@@ -34,6 +34,8 @@ class Sam3VideoPredictor:
         async_loading_frames=False,
         video_loader_type="cv2",
         apply_temporal_disambiguation: bool = True,
+        confidence_threshold: float = 0.5,
+        recondition_every_nth_frame: int = 16
     ):
         self.async_loading_frames = async_loading_frames
         self.video_loader_type = video_loader_type
@@ -47,6 +49,8 @@ class Sam3VideoPredictor:
                 geo_encoder_use_img_cross_attn=geo_encoder_use_img_cross_attn,
                 strict_state_dict_loading=strict_state_dict_loading,
                 apply_temporal_disambiguation=apply_temporal_disambiguation,
+                confidence_threshold=confidence_threshold,
+                recondition_every_nth_frame=recondition_every_nth_frame
             )
             .cuda()
             .eval()
