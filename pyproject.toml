@@ -33,6 +33,9 @@ dependencies = [
     "iopath>=0.1.10",
     "typing_extensions",
     "huggingface_hub",
+    "einops",
+    "decord",
+    "pycocotools"
 ]
 
 [project.optional-dependencies]
@@ -83,7 +86,7 @@ train = [
 "Bug Tracker" = "https://github.com/facebookresearch/sam3/issues"
 
 [tool.setuptools]
-packages = ["sam3", "sam3.model"]
+packages = ["sam3", "sam3.model", "sam3.model.utils", "sam3.sam", "sam3.train", "sam3.train.data", "sam3.perflib", "sam3.perflib.triton", "sam3.agent", "sam3.agent.helpers"]
 
 [tool.setuptools.dynamic]
 version = {attr = "sam3.__version__"}
