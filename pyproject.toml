@@ -26,7 +26,7 @@ classifiers = [
 ]
 dependencies = [
     "timm>=1.0.17",
-    "numpy==1.26",
+    "numpy>=1.26,<2",
     "tqdm",
     "ftfy==6.1.1",
     "regex",
@@ -85,8 +85,16 @@ train = [
 "Homepage" = "https://github.com/facebookresearch/sam3"
 "Bug Tracker" = "https://github.com/facebookresearch/sam3/issues"
 
-[tool.setuptools]
-packages = ["sam3", "sam3.model", "sam3.model.utils", "sam3.sam", "sam3.train", "sam3.train.data", "sam3.perflib", "sam3.perflib.triton", "sam3.agent", "sam3.agent.helpers"]
+#[tool.setuptools]
+#packages = ["sam3", "sam3.model", "sam3.model.utils", "sam3.sam", "sam3.train", "sam3.train.data", "sam3.perflib", "sam3.perflib.triton", "sam3.agent", "sam3.agent.helpers"]
+
+[tool.setuptools.packages.find]
+include = ["sam3*"]
+exclude = ["build*", "scripts*", "examples*"]
+
+[tool.setuptools.package-data]
+sam3 = ["assets/*.txt.gz"]
+# new end
 
 [tool.setuptools.dynamic]
 version = {attr = "sam3.__version__"}
