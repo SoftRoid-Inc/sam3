@@ -684,7 +684,8 @@ def build_sam3_video_model(
     device="cuda" if torch.cuda.is_available() else "cpu",
     compile=False,
     confidence_threshold: float = 0.5,
-    recondition_every_nth_frame: int = 16
+    recondition_every_nth_frame: int = 16,
+    max_num_objects: int = -1,
 ) -> Sam3VideoInferenceWithInstanceInteractivity:
     """
     Build SAM3 dense tracking model.
@@ -745,6 +746,7 @@ def build_sam3_video_model(
         model = Sam3VideoInferenceWithInstanceInteractivity(
             detector=detector,
             tracker=tracker,
+            max_num_objects=max_num_objects,
             score_threshold_detection=confidence_threshold,
             assoc_iou_thresh=0.1,
             det_nms_thresh=0.1,
@@ -772,6 +774,7 @@ def build_sam3_video_model(
         model = Sam3VideoInferenceWithInstanceInteractivity(
             detector=detector,
             tracker=tracker,
+            max_num_objects=max_num_objects,
             score_threshold_detection=confidence_threshold,
             assoc_iou_thresh=0.1,
             det_nms_thresh=0.1,

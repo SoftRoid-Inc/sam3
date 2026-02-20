@@ -36,6 +36,7 @@ class Sam3VideoPredictor(Sam3BasePredictor):
         confidence_threshold: float = 0.5,
         recondition_every_nth_frame: int = 16,
         compile: bool = False,
+        max_num_objects: int = -1,
     ):
         super().__init__()
         self.async_loading_frames = async_loading_frames
@@ -53,6 +54,7 @@ class Sam3VideoPredictor(Sam3BasePredictor):
                 confidence_threshold=confidence_threshold,
                 recondition_every_nth_frame=recondition_every_nth_frame,
                 compile=compile,
+                max_num_objects=max_num_objects,
             )
             .cuda()
             .eval()
