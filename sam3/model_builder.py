@@ -588,7 +588,10 @@ def build_sam3_image_model(
         )
 
     # Create visual components
-    compile_mode = "default" if compile else None
+    if isinstance(compile, str):
+        compile_mode = compile
+    else:
+        compile_mode = "default" if compile else None
     vision_encoder = _create_vision_backbone(
         compile_mode=compile_mode, enable_inst_interactivity=enable_inst_interactivity
     )

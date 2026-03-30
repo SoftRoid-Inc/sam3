@@ -220,3 +220,79 @@ class Sam3Processor:
         state["boxes"] = boxes
         state["scores"] = out_probs
         return state
+
+    def forward_grounding_batched(
+        self,
+        state: Dict,
+        num_categories: int,
+        mask_height: int = 256,
+        mask_width: int = 512,
+    ) -> torch.Tensor:
+        """Run grounding for all categories in a single batched forward pass.
+
+        Instead of calling _forward_grounding N times (once per category),
+        this sets text_ids=[0..N-1] and img_ids=[0..0] to process all
+        categories through the encoder+decoder in one call.
+
+        Args:
+            state: dict with 'backbone_out' (from set_image + cached text)
+            num_categories: number of text categories
+            mask_height: height for intermediate mask interpolation on GPU
+            mask_width: width for intermediate mask interpolation on GPU
+
+        Returns:
+            Boolean tensor of shape (num_categories, mask_height, mask_width)
+            where True = category present at that pixel.
+        """
+        # Create batched find_stage (outside inference_mode so tensors are mutable)
+        batched_find = FindStage(
+            img_ids=torch.zeros(num_categories, device=self.device, dtype=torch.long),
+            text_ids=torch.arange(num_categories, device=self.device, dtype=torch.long),
+            input_boxes=None,
+            input_boxes_mask=None,
+            input_boxes_label=None,
+            input_points=None,
+            input_points_mask=None,
+        )
+        geometric_prompt = self.model._get_dummy_prompt(num_prompts=num_categories)
+
+        with torch.inference_mode():
+            outputs = self.model.forward_grounding(
+                backbone_out=state["backbone_out"],
+                find_input=batched_find,
+                geometric_prompt=geometric_prompt,
+                find_target=None,
+            )
+
+            # pred_masks: (batch, num_queries, mask_h, mask_w) — raw logits
+            # pred_logits: (batch, num_queries, 1)
+            # presence_logit_dec: (batch, num_queries)
+            pred_masks = outputs["pred_masks"]
+            pred_logits = outputs["pred_logits"]
+            presence = outputs["presence_logit_dec"]
+
+            # Compute per-query confidence: class_prob * presence_prob
+            probs = pred_logits.sigmoid()
+            presence_score = presence.sigmoid().unsqueeze(-1)
+            probs = (probs * presence_score).squeeze(-1)  # (batch, num_queries)
+
+            # Mask out low-confidence queries by setting their mask logits to -inf
+            keep = probs > self.confidence_threshold  # (batch, num_queries)
+            pred_masks = pred_masks.masked_fill(~keep[:, :, None, None], float("-inf"))
+
+            # Union over queries: max logit per pixel, then interpolate, then threshold
+            # any(sigmoid(x) > 0.5) ≡ sigmoid(max(x)) > 0.5 ≡ max(x) > 0
+            max_logits = pred_masks.max(dim=1).values  # (batch, mask_h, mask_w)
+
+            # Interpolate to target resolution on GPU
+            max_logits = interpolate(
+                max_logits.unsqueeze(1),
+                (mask_height, mask_width),
+                mode="bilinear",
+                align_corners=False,
+            ).squeeze(1)  # (batch, mask_height, mask_width)
+
+            # Threshold: logit > 0 ≡ sigmoid > 0.5
+            union_masks = max_logits > 0  # (batch, mask_height, mask_width)
+
+        return union_masks
