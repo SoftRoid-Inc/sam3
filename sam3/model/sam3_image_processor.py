@@ -296,3 +296,79 @@ class Sam3Processor:
             union_masks = max_logits > 0  # (batch, mask_height, mask_width)
 
         return union_masks
+
+    def forward_grounding_multi_image(
+        self,
+        state: Dict,
+        num_images: int,
+        num_categories: int,
+        mask_height: int = 256,
+        mask_width: int = 512,
+    ) -> torch.Tensor:
+        """Run grounding for multiple images × all categories in one forward pass.
+
+        Processes num_images images with num_categories each in a single
+        encoder+decoder call (total batch = num_images * num_categories).
+
+        Args:
+            state: dict with 'backbone_out' (from set_image_batch + cached text)
+            num_images: number of images in the batch
+            num_categories: number of text categories
+            mask_height: height for intermediate mask interpolation on GPU
+            mask_width: width for intermediate mask interpolation on GPU
+
+        Returns:
+            Boolean tensor of shape (num_images, num_categories, mask_height, mask_width)
+            where True = category present at that pixel.
+        """
+        total_batch = num_images * num_categories
+
+        # img_ids: [0,0,...,0, 1,1,...,1, ..., N-1,N-1,...,N-1]
+        # text_ids: [0,1,...,C-1, 0,1,...,C-1, ..., 0,1,...,C-1]
+        img_ids = torch.arange(num_images, device=self.device, dtype=torch.long).repeat_interleave(num_categories)
+        text_ids = torch.arange(num_categories, device=self.device, dtype=torch.long).repeat(num_images)
+
+        batched_find = FindStage(
+            img_ids=img_ids,
+            text_ids=text_ids,
+            input_boxes=None,
+            input_boxes_mask=None,
+            input_boxes_label=None,
+            input_points=None,
+            input_points_mask=None,
+        )
+        geometric_prompt = self.model._get_dummy_prompt(num_prompts=total_batch)
+
+        with torch.inference_mode():
+            outputs = self.model.forward_grounding(
+                backbone_out=state["backbone_out"],
+                find_input=batched_find,
+                geometric_prompt=geometric_prompt,
+                find_target=None,
+            )
+
+            pred_masks = outputs["pred_masks"]
+            pred_logits = outputs["pred_logits"]
+            presence = outputs["presence_logit_dec"]
+
+            probs = pred_logits.sigmoid()
+            presence_score = presence.sigmoid().unsqueeze(-1)
+            probs = (probs * presence_score).squeeze(-1)
+
+            keep = probs > self.confidence_threshold
+            pred_masks = pred_masks.masked_fill(~keep[:, :, None, None], float("-inf"))
+
+            max_logits = pred_masks.max(dim=1).values
+
+            max_logits = interpolate(
+                max_logits.unsqueeze(1),
+                (mask_height, mask_width),
+                mode="bilinear",
+                align_corners=False,
+            ).squeeze(1)
+
+            union_masks = max_logits > 0
+            # Reshape: (num_images * num_categories, H, W) -> (num_images, num_categories, H, W)
+            union_masks = union_masks.view(num_images, num_categories, mask_height, mask_width)
+
+        return union_masks
