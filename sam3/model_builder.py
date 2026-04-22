@@ -1084,6 +1084,7 @@ def build_sam3_multiplex_video_predictor(
     session_expiration_sec: int = 1200,
     default_output_prob_thresh: float = 0.5,
     async_loading_frames: bool = True,
+    recondition_every_nth_frame: int = 16,
 ):
     """
     Build a fully-initialized Sam3MultiplexVideoPredictor.
@@ -1183,7 +1184,7 @@ def build_sam3_multiplex_video_predictor(
         suppress_overlapping_based_on_recent_occlusion_threshold=0.7,
         suppress_det_close_to_boundary=True,
         fill_hole_area=0,  # OV effectively 0 (Sam3MultiplexTrackerPredictor Hydra override clobbers yaml's 16)
-        recondition_every_nth_frame=16,
+        recondition_every_nth_frame=recondition_every_nth_frame,
         use_iom_recondition=True,
         iom_thresh_recondition=0.5,
         masklet_confirmation_enable=True,
